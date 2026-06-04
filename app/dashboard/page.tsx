@@ -487,6 +487,44 @@ export default function DashboardPage() {
               )}
             </>
           )}
+          {/* Weather Statement */}
+{weatherData && (
+  <div
+    style={{
+      background: 'var(--col-surface)',
+      border: '1px solid var(--col-border)',
+      borderRadius: 'var(--r-xl)',
+      padding: '1rem 1.25rem',
+      marginTop: '1rem',
+    }}
+  >
+    <p
+      className="section-label"
+      style={{
+        marginBottom: '0.5rem',
+        color: 'var(--col-green)',
+      }}
+    >
+      Weather Overview
+    </p>
+
+    <p
+      style={{
+        fontSize: '0.875rem',
+        lineHeight: 1.7,
+        color: 'var(--col-text-secondary)',
+      }}
+    >
+      Currently, {weatherData.location.name} is experiencing{' '}
+      {weatherData.current.condition.toLowerCase()} conditions with a
+      temperature of {weatherData.current.temperature}°. Humidity is at{' '}
+      {weatherData.current.humidity}% and wind speeds are around{' '}
+      {weatherData.current.windSpeed} km/h. Farmers should monitor weather
+      changes and plan irrigation, spraying, harvesting, or planting
+      activities accordingly.
+    </p>
+  </div>
+)}
 
           {/* Empty state */}
           {!loading && !weatherData && !error && (

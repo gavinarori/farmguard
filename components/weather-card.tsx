@@ -3,7 +3,13 @@
 
 import { CloudRain, Sun, Cloud, Wind, Droplets, Eye, Gauge, Thermometer } from 'lucide-react';
 import { useStore } from '@/lib/store';
-import { weatherEmoji, displayTemp, formatDate, formatTime } from '@/lib/utils';
+import {
+  weatherEmoji,
+  isNightTime,
+  displayTemp,
+  formatDate,
+  formatTime,
+} from '@/lib/utils';
 import { cn } from '@/lib/utils';
 
 function WeatherIcon({ condition, size = 'md' }: { condition: string; size?: 'sm' | 'md' | 'lg' }) {
@@ -99,7 +105,7 @@ export function CurrentWeatherCard({
             )}
           </div>
           <div style={{ fontSize: '4.5rem', lineHeight: 1, opacity: 0.9, filter: 'drop-shadow(0 4px 12px rgba(0,0,0,0.4))' }}>
-            {weatherEmoji(condition)}
+             {weatherEmoji(condition, isNightTime())}
           </div>
         </div>
       </div>
@@ -186,7 +192,7 @@ export function ForecastCard({ date, maxTemp, minTemp, condition, precipitation,
       }}
     >
       <p className="section-label">{formatDate(date)}</p>
-      <div style={{ fontSize: '1.8rem', margin: '0.2rem 0' }}>{weatherEmoji(condition)}</div>
+      <div style={{ fontSize: '1.8rem', margin: '0.2rem 0' }}> {weatherEmoji(condition, false)}</div>
       <p style={{ fontSize: '0.7rem', color: 'var(--col-text-muted)', textAlign: 'center', lineHeight: 1.3 }}>
         {condition}
       </p>
@@ -235,7 +241,14 @@ export function HourlyCard({ time, temperature, condition, humidity, precipMm = 
       }}
     >
       <p className="num section-label" style={{ whiteSpace: 'nowrap', fontSize: '0.65rem' }}>{friendlyTime}</p>
-      <div style={{ fontSize: '1.4rem' }}>{weatherEmoji(condition)}</div>
+      <div style={{ fontSize: '1.4rem' }}>  {weatherEmoji(
+    condition,
+    isNightTime(
+      time.includes('T')
+        ? new Date(time)
+        : new Date(time.replace(' ', 'T'))
+    )
+  )}</div>
       <p className="num" style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--col-text-primary)' }}>
         {tempDisplay}
       </p>
