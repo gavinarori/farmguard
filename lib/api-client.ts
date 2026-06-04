@@ -1,4 +1,4 @@
-const API_BASE = 'https://api.weatherai.io/api/v1/free';
+const API_BASE = 'https://api.weather-ai.co/v1';
 
 interface ApiResponse<T> {
   success: boolean;
