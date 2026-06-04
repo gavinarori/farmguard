@@ -1,3 +1,4 @@
+
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
@@ -45,6 +46,23 @@ export function normalizeWeather(raw: any): WeatherData {
   const loc = raw.location ?? {};
   const cur = raw.current ?? {};
 
+  // ── Resolve location name ──────────────────────────────────
+  // WeatherAI returns ip_geo with city info; also check location object fields
+  const ipGeo = raw.ip_geo ?? {};
+  const locationName =
+    loc.resolvedCity ??   // injected by getWeatherByCity geocoding
+    loc.name ??
+    loc.city ??
+    ipGeo.city ??         // from WeatherAI ip_geo block
+    loc.region ??
+    ipGeo.region ??
+    'Unknown';
+
+  const countryCode =
+    loc.country ??
+    ipGeo.country ??
+    undefined;
+
   // forecast: WeatherAI returns forecast.forecastday[] or a flat forecast[]
   const forecastDays: any[] =
     raw.forecast?.forecastday ?? raw.forecast ?? raw.daily ?? [];
@@ -53,12 +71,12 @@ export function normalizeWeather(raw: any): WeatherData {
     const day = d.day ?? d;
     return {
       date: d.date ?? d.date_epoch ?? '',
-      maxTemp: day.maxtemp_c ?? day.max_temp_c ?? day.maxTemp ?? 0,
-      minTemp: day.mintemp_c ?? day.min_temp_c ?? day.minTemp ?? 0,
+      maxTemp: day.maxtemp_c ?? day.max_temp_c ?? day.maxTemp ?? day.temp_max ?? 0,
+      minTemp: day.mintemp_c ?? day.min_temp_c ?? day.minTemp ?? day.temp_min ?? 0,
       condition:
         day.condition?.text ?? day.condition ?? day.condition_text ?? '',
       precipitation:
-        day.totalprecip_mm ?? day.total_precip_mm ?? day.precipitation ?? 0,
+        day.totalprecip_mm ?? day.total_precip_mm ?? day.precipitation ?? day.precipitation_sum ?? 0,
       humidity: day.avghumidity ?? day.humidity ?? 0,
       uvIndex: day.uv ?? day.uv_index ?? day.uvIndex ?? 0,
     };
@@ -72,8 +90,8 @@ export function normalizeWeather(raw: any): WeatherData {
       temperature: h.temp_c ?? h.temperature ?? 0,
       condition: h.condition?.text ?? h.condition ?? h.condition_text ?? '',
       humidity: h.humidity ?? 0,
-      precipMm: h.precip_mm ?? h.precipMm ?? 0,
-      windKph: h.wind_kph ?? h.windKph ?? 0,
+      precipMm: h.precip_mm ?? h.precipMm ?? h.precipitation_probability ?? 0,
+      windKph: h.wind_kph ?? h.wind_speed ?? h.windKph ?? 0,
     }));
   } else if (forecastDays.length > 0) {
     (forecastDays[0]?.hour ?? []).forEach((h: any) => {
@@ -92,15 +110,15 @@ export function normalizeWeather(raw: any): WeatherData {
     location: {
       lat: loc.lat ?? 0,
       lon: loc.lon ?? loc.lng ?? 0,
-      name: loc.name ?? loc.city ?? 'Unknown',
-      country: loc.country ?? loc.region ?? undefined,
+      name: locationName,
+      country: countryCode,
     },
     current: {
       temperature: cur.temp_c ?? cur.temperature ?? 0,
-      feelsLike: cur.feelslike_c ?? cur.feels_like ?? cur.temp_c ?? 0,
+      feelsLike: cur.feelslike_c ?? cur.feels_like ?? cur.feelsLike ?? cur.temp_c ?? cur.temperature ?? 0,
       condition: cur.condition?.text ?? cur.condition ?? cur.condition_text ?? 'Clear',
       humidity: cur.humidity ?? 0,
-      windSpeed: cur.wind_kph ?? cur.windSpeed ?? 0,
+      windSpeed: cur.wind_kph ?? cur.wind_speed ?? cur.windSpeed ?? 0,
       uvIndex: cur.uv ?? cur.uv_index ?? cur.uvIndex ?? 0,
       precipMm: cur.precip_mm ?? 0,
       visibilityKm: cur.vis_km ?? cur.visibilityKm ?? 10,

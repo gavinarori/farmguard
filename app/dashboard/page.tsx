@@ -107,32 +107,42 @@ export default function DashboardPage() {
             }}
           >
             {/* Wordmark */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-              <div
-                style={{
-                  width: '30px',
-                  height: '30px',
-                  borderRadius: '8px',
-                  background: 'linear-gradient(135deg, #5cad6e, #3d7a4e)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-              >
-                <TreePine style={{ width: '15px', height: '15px', color: '#0b0f0d' }} />
-              </div>
-              <span
-                style={{
-                  fontFamily: 'var(--font-display)',
-                  fontSize: '1.3rem',
-                  fontWeight: 700,
-                  color: 'var(--col-text-primary)',
-                  letterSpacing: '-0.02em',
-                }}
-              >
-                Farm<span style={{ color: 'var(--col-green)' }}>Guard</span>
-              </span>
-            </div>
+{/* Wordmark */}
+<div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+  <div
+    style={{
+      width: '30px',
+      height: '30px',
+      borderRadius: '8px',
+      background: 'linear-gradient(135deg, #5cad6e, #3d7a4e)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      flexShrink: 0,
+    }}
+  >
+    <TreePine
+      style={{
+        width: '15px',
+        height: '15px',
+        color: '#0b0f0d',
+      }}
+    />
+  </div>
+
+  <span
+    className="farmguard-logo-text"
+    style={{
+      fontFamily: 'var(--font-display)',
+      fontSize: '1.3rem',
+      fontWeight: 700,
+      color: 'var(--col-text-primary)',
+      letterSpacing: '-0.02em',
+    }}
+  >
+    Farm<span style={{ color: 'var(--col-green)' }}>Guard</span>
+  </span>
+</div>
 
             {/* Nav actions */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -477,6 +487,44 @@ export default function DashboardPage() {
               )}
             </>
           )}
+          {/* Weather Statement */}
+{weatherData && (
+  <div
+    style={{
+      background: 'var(--col-surface)',
+      border: '1px solid var(--col-border)',
+      borderRadius: 'var(--r-xl)',
+      padding: '1rem 1.25rem',
+      marginTop: '1rem',
+    }}
+  >
+    <p
+      className="section-label"
+      style={{
+        marginBottom: '0.5rem',
+        color: 'var(--col-green)',
+      }}
+    >
+      Weather Overview
+    </p>
+
+    <p
+      style={{
+        fontSize: '0.875rem',
+        lineHeight: 1.7,
+        color: 'var(--col-text-secondary)',
+      }}
+    >
+      Currently, {weatherData.location.name} is experiencing{' '}
+      {weatherData.current.condition.toLowerCase()} conditions with a
+      temperature of {weatherData.current.temperature}°. Humidity is at{' '}
+      {weatherData.current.humidity}% and wind speeds are around{' '}
+      {weatherData.current.windSpeed} km/h. Farmers should monitor weather
+      changes and plan irrigation, spraying, harvesting, or planting
+      activities accordingly.
+    </p>
+  </div>
+)}
 
           {/* Empty state */}
           {!loading && !weatherData && !error && (
