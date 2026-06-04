@@ -1,8 +1,9 @@
+
 'use client';
 
 import { CloudRain, Sun, Cloud, Wind, Droplets, Eye, Gauge, Thermometer } from 'lucide-react';
 import { useStore } from '@/lib/store';
-import { weatherEmoji, displayTemp, formatDate } from '@/lib/utils';
+import { weatherEmoji, displayTemp, formatDate, formatTime } from '@/lib/utils';
 import { cn } from '@/lib/utils';
 
 function WeatherIcon({ condition, size = 'md' }: { condition: string; size?: 'sm' | 'md' | 'lg' }) {
@@ -215,6 +216,9 @@ export function HourlyCard({ time, temperature, condition, humidity, precipMm = 
     ? `${Math.round(temperature)}°`
     : `${Math.round(temperature * 9 / 5 + 32)}°`;
 
+  // Format the time to be human-friendly: "2 PM", "Noon", "Midnight"
+  const friendlyTime = formatTime(time);
+
   return (
     <div
       style={{
@@ -230,7 +234,7 @@ export function HourlyCard({ time, temperature, condition, humidity, precipMm = 
         textAlign: 'center',
       }}
     >
-      <p className="num section-label">{time}</p>
+      <p className="num section-label" style={{ whiteSpace: 'nowrap', fontSize: '0.65rem' }}>{friendlyTime}</p>
       <div style={{ fontSize: '1.4rem' }}>{weatherEmoji(condition)}</div>
       <p className="num" style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--col-text-primary)' }}>
         {tempDisplay}

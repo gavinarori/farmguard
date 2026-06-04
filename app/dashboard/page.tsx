@@ -107,32 +107,42 @@ export default function DashboardPage() {
             }}
           >
             {/* Wordmark */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-              <div
-                style={{
-                  width: '30px',
-                  height: '30px',
-                  borderRadius: '8px',
-                  background: 'linear-gradient(135deg, #5cad6e, #3d7a4e)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-              >
-                <TreePine style={{ width: '15px', height: '15px', color: '#0b0f0d' }} />
-              </div>
-              <span
-                style={{
-                  fontFamily: 'var(--font-display)',
-                  fontSize: '1.3rem',
-                  fontWeight: 700,
-                  color: 'var(--col-text-primary)',
-                  letterSpacing: '-0.02em',
-                }}
-              >
-                Farm<span style={{ color: 'var(--col-green)' }}>Guard</span>
-              </span>
-            </div>
+{/* Wordmark */}
+<div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+  <div
+    style={{
+      width: '30px',
+      height: '30px',
+      borderRadius: '8px',
+      background: 'linear-gradient(135deg, #5cad6e, #3d7a4e)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      flexShrink: 0,
+    }}
+  >
+    <TreePine
+      style={{
+        width: '15px',
+        height: '15px',
+        color: '#0b0f0d',
+      }}
+    />
+  </div>
+
+  <span
+    className="farmguard-logo-text"
+    style={{
+      fontFamily: 'var(--font-display)',
+      fontSize: '1.3rem',
+      fontWeight: 700,
+      color: 'var(--col-text-primary)',
+      letterSpacing: '-0.02em',
+    }}
+  >
+    Farm<span style={{ color: 'var(--col-green)' }}>Guard</span>
+  </span>
+</div>
 
             {/* Nav actions */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
