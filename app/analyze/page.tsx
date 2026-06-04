@@ -1,187 +1,335 @@
 'use client';
 
-import { useState } from 'react';
-import { useStore } from '@/lib/store';
-import { analyzeTree } from '@/lib/api-client';
+import { useState, useEffect } from 'react';
+import Link from 'next/link';
+import {
+  Loader2, ArrowLeft, RotateCcw, Upload,
+  TreePine, Layers, Leaf, Sparkles, History,
+} from 'lucide-react';
+
+import { useStore, normalizeAnalysis } from '@/lib/store';
+import { analyzeTree, getQuotaUsage } from '@/lib/api-client';
 import { ImageUploader } from '@/components/image-uploader';
 import { AnalysisResults } from '@/components/analysis-results';
-import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
-import { Loader2 } from 'lucide-react';
-import Link from 'next/link';
 
 export default function AnalyzePage() {
-  const { addAnalysis, quotaUsed, quotaLimit } = useStore();
+  const { addAnalysis, quotaUsed, quotaLimit, quotaRemaining, setQuota } = useStore();
 
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [meta, setMeta] = useState<{ county?: string; landAcres?: number; location?: string; notes?: string }>({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [result, setResult] = useState<any>(null);
+  const [result, setResult] = useState<ReturnType<typeof normalizeAnalysis> | null>(null);
 
-  const handleImageSelected = (file: File) => {
-    setSelectedFile(file);
-    setError(null);
-    setResult(null);
-  };
+  useEffect(() => {
+    getQuotaUsage()
+      .then((d) => setQuota(d.used ?? 0, d.limit ?? 5, d.remaining ?? 5))
+      .catch(() => {});
+  }, [setQuota]);
 
   const handleAnalyze = async () => {
-    if (!selectedFile) {
-      setError('Please select an image');
-      return;
-    }
-
-    // Check quota
+    if (!selectedFile) { setError('Please select an image first.'); return; }
     if (quotaUsed >= quotaLimit) {
-      setError(
-        'You have reached your daily analysis limit. Try again tomorrow.'
-      );
+      setError('Monthly quota reached. Upgrade your plan or wait for reset.');
       return;
     }
-
-    setLoading(true);
-    setError(null);
-
+    setLoading(true); setError(null);
     try {
-
-      const imageUrl = URL.createObjectURL(selectedFile);
-
-      const analysisResult = await analyzeTree(imageUrl);
-
-      // Create analysis record
-      const analysis = {
-        id: `analysis-${Date.now()}`,
-        timestamp: new Date().toISOString(),
-        imageUrl,
-        health: analysisResult.health || 'healthy',
-        confidence: analysisResult.confidence || 0.85,
-        observations: analysisResult.observations || [
-          'Leaf color appears normal',
-          'No visible disease symptoms',
-        ],
-        recommendations: analysisResult.recommendations || [
-          'Continue regular monitoring',
-          'Maintain proper watering schedule',
-        ],
-      };
-
+      const raw = await analyzeTree(selectedFile, { ...meta, location: meta.location ?? 'Farm' });
+      const blobUrl = URL.createObjectURL(selectedFile);
+      const analysis = normalizeAnalysis(raw, blobUrl);
       setResult(analysis);
       addAnalysis(analysis);
-    } catch (err: any) {
-      setError(err.message || 'Failed to analyze tree');
-      console.error('[v0] Analysis error:', err);
-    } finally {
-      setLoading(false);
-    }
+      getQuotaUsage()
+        .then((d) => setQuota(d.used ?? 0, d.limit ?? 5, d.remaining ?? 5))
+        .catch(() => {});
+    } catch (e: any) {
+      setError(e.message ?? 'Analysis failed. Please try again.');
+    } finally { setLoading(false); }
   };
 
+  const resetForm = () => { setResult(null); setSelectedFile(null); setError(null); setMeta({}); };
+
+  const quotaPct = quotaLimit > 0 ? Math.min(100, (quotaUsed / quotaLimit) * 100) : 0;
+  const quotaBarColor = quotaPct >= 90 ? '#c05c5c' : quotaPct >= 70 ? '#d4934a' : '#5cad6e';
+
   return (
-    <main className="min-h-screen bg-gradient-to-br from-blue-50 to-green-50 p-4 md:p-8">
-      <div className="max-w-2xl mx-auto space-y-6">
-        {/* Header */}
-        <div className="flex items-center justify-between">
+    <div className="app-bg" style={{ minHeight: '100vh' }}>
+      <div style={{ position: 'relative', zIndex: 1 }}>
+
+        {/* ── Top Nav ─────────────────────────────────────────── */}
+        <nav className="nav-bar">
+          <div
+            style={{
+              maxWidth: '820px',
+              margin: '0 auto',
+              padding: '0 1.5rem',
+              height: '60px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+            }}
+          >
+            <Link href="/dashboard" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', textDecoration: 'none' }}>
+              <button className="btn btn-ghost" style={{ padding: '0.4rem 0.8rem', fontSize: '0.78rem' }}>
+                <ArrowLeft style={{ width: '0.85rem', height: '0.85rem' }} />
+                Dashboard
+              </button>
+            </Link>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+              <div
+                style={{
+                  width: '28px',
+                  height: '28px',
+                  borderRadius: '7px',
+                  background: 'linear-gradient(135deg, #5cad6e, #3d7a4e)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <TreePine style={{ width: '14px', height: '14px', color: '#0b0f0d' }} />
+              </div>
+              <span
+                style={{
+                  fontFamily: 'var(--font-display)',
+                  fontSize: '1.15rem',
+                  fontWeight: 700,
+                  color: 'var(--col-text-primary)',
+                  letterSpacing: '-0.02em',
+                }}
+              >
+                Farm<span style={{ color: 'var(--col-green)' }}>Guard</span>
+              </span>
+            </div>
+
+            <Link href="/history">
+              <button className="btn btn-ghost" style={{ padding: '0.4rem 0.8rem', fontSize: '0.78rem' }}>
+                <History style={{ width: '0.85rem', height: '0.85rem' }} />
+                History
+              </button>
+            </Link>
+          </div>
+        </nav>
+
+        {/* ── Main ────────────────────────────────────────────── */}
+        <div
+          style={{
+            maxWidth: '680px',
+            margin: '0 auto',
+            padding: '2rem 1.5rem',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '1.25rem',
+          }}
+        >
+          {/* Page header */}
           <div>
-            <h1 className="text-4xl font-bold text-gray-900">
-              Analyze Your Trees
+            <h1
+              style={{
+                fontFamily: 'var(--font-display)',
+                fontSize: 'clamp(1.75rem, 4vw, 2.25rem)',
+                fontWeight: 900,
+                color: 'var(--col-text-primary)',
+                lineHeight: 1.1,
+                marginBottom: '0.3rem',
+              }}
+            >
+              Analyze Trees
             </h1>
-            <p className="text-gray-600 mt-1">
-              Upload an image to check tree health
+            <p style={{ fontSize: '0.85rem', color: 'var(--col-text-muted)' }}>
+              Upload a farm image — AI counts trees & assesses health
             </p>
           </div>
-          <Link href="/dashboard">
-            <Button variant="outline">Back to Dashboard</Button>
-          </Link>
-        </div>
 
-        {/* Quota Info */}
-        <Card className="p-4 bg-blue-50 border-blue-200">
-          <p className="text-sm text-gray-700">
-            <span className="font-semibold">Analyses used today:</span>{' '}
-            {quotaUsed} of {quotaLimit}
-          </p>
-          <div className="mt-2 w-full bg-blue-200 rounded-full h-2">
-            <div
-              className="bg-blue-600 h-2 rounded-full transition-all"
-              style={{ width: `${(quotaUsed / quotaLimit) * 100}%` }}
-            />
-          </div>
-        </Card>
-
-        {/* Error Message */}
-        {error && (
-          <Card className="p-4 bg-red-50 border-red-200">
-            <p className="text-sm text-red-700">{error}</p>
-          </Card>
-        )}
-
-        {/* Analysis Result */}
-        {result && <AnalysisResults analysis={result} />}
-
-        {/* Image Uploader */}
-        {!result && (
-          <>
-            <ImageUploader
-              onImageSelected={handleImageSelected}
-              isLoading={loading}
-            />
-
-            {/* Analyze Button */}
-            <div className="flex gap-3">
-              <Button
-                onClick={handleAnalyze}
-                disabled={!selectedFile || loading || quotaUsed >= quotaLimit}
-                className="flex-1 bg-green-600 hover:bg-green-700 h-10"
-              >
-                {loading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                {loading ? 'Analyzing...' : 'Analyze Tree'}
-              </Button>
-              <Link href="/history" className="flex-1">
-                <Button variant="outline" className="w-full">
-                  View History
-                </Button>
-              </Link>
-            </div>
-          </>
-        )}
-
-        {/* New Analysis Button */}
-        {result && (
-          <Button
-            onClick={() => {
-              setResult(null);
-              setSelectedFile(null);
-              setError(null);
-            }}
-            className="w-full bg-green-600 hover:bg-green-700"
+          {/* Quota bar */}
+          <div
+            className="card-surface"
+            style={{ padding: '1rem 1.25rem' }}
           >
-            Analyze Another Tree
-          </Button>
-        )}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.65rem' }}>
+              <p className="section-label">Monthly Analyses</p>
+              <div className="num" style={{ display: 'flex', alignItems: 'baseline', gap: '0.25rem', fontSize: '0.85rem' }}>
+                <span style={{ fontWeight: 700, color: 'var(--col-text-primary)' }}>{quotaUsed}</span>
+                <span style={{ color: 'var(--col-text-muted)' }}>/ {quotaLimit}</span>
+                {quotaRemaining > 0 && (
+                  <span style={{ color: 'var(--col-green)', fontSize: '0.72rem', marginLeft: '0.4rem' }}>
+                    {quotaRemaining} remaining
+                  </span>
+                )}
+              </div>
+            </div>
+            <div className="progress-track">
+              <div
+                className="progress-fill"
+                style={{ width: `${quotaPct}%`, background: quotaBarColor }}
+              />
+            </div>
+          </div>
 
-        {/* Info Section */}
-        <Card className="p-6 bg-white border-gray-200">
-          <h3 className="font-semibold text-gray-900 mb-3">
-            How to get accurate results:
-          </h3>
-          <ul className="space-y-2 text-sm text-gray-700">
-            <li className="flex gap-2">
-              <span className="text-green-600 font-bold">✓</span>
-              <span>Photograph the tree in good lighting</span>
-            </li>
-            <li className="flex gap-2">
-              <span className="text-green-600 font-bold">✓</span>
-              <span>Include leaves and stems in the image</span>
-            </li>
-            <li className="flex gap-2">
-              <span className="text-green-600 font-bold">✓</span>
-              <span>Avoid blurry or out-of-focus images</span>
-            </li>
-            <li className="flex gap-2">
-              <span className="text-green-600 font-bold">✓</span>
-              <span>Get close enough to see leaf details</span>
-            </li>
-          </ul>
-        </Card>
+          {/* Error */}
+          {error && (
+            <div
+              style={{
+                padding: '0.75rem 1rem',
+                background: 'rgba(192,92,92,0.1)',
+                border: '1px solid rgba(192,92,92,0.25)',
+                borderRadius: 'var(--r-md)',
+                fontSize: '0.83rem',
+                color: '#c05c5c',
+              }}
+            >
+              {error}
+            </div>
+          )}
+
+          {/* ── Results view ─────────────────────────────────── */}
+          {result && (
+            <>
+              <div className="card-surface" style={{ padding: '1.25rem' }}>
+                {/* Success header */}
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.6rem',
+                    marginBottom: '1rem',
+                    paddingBottom: '1rem',
+                    borderBottom: '1px solid var(--col-border)',
+                  }}
+                >
+                  <div
+                    style={{
+                      width: '32px',
+                      height: '32px',
+                      borderRadius: '8px',
+                      background: 'var(--col-green-glow)',
+                      border: '1px solid rgba(92,173,110,0.3)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      flexShrink: 0,
+                    }}
+                  >
+                    <Sparkles style={{ width: '0.9rem', height: '0.9rem', color: 'var(--col-green)' }} />
+                  </div>
+                  <div>
+                    <p style={{ fontWeight: 700, color: 'var(--col-text-primary)', fontSize: '0.95rem' }}>
+                      Analysis Complete
+                    </p>
+                    <p style={{ fontSize: '0.72rem', color: 'var(--col-text-muted)' }}>
+                      AI-powered tree health assessment
+                    </p>
+                  </div>
+                </div>
+
+                <AnalysisResults analysis={result} />
+              </div>
+
+              <div style={{ display: 'flex', gap: '0.6rem' }}>
+                <button
+                  onClick={resetForm}
+                  className="btn btn-primary"
+                  style={{ flex: 1, padding: '0.7rem', fontSize: '0.875rem' }}
+                >
+                  <RotateCcw style={{ width: '0.9rem', height: '0.9rem' }} />
+                  Analyze Another
+                </button>
+                <Link href="/history" style={{ flex: 1 }}>
+                  <button className="btn btn-ghost" style={{ width: '100%', padding: '0.7rem', fontSize: '0.875rem' }}>
+                    View History
+                  </button>
+                </Link>
+              </div>
+            </>
+          )}
+
+          {/* ── Upload form ───────────────────────────────────── */}
+          {!result && (
+            <>
+              <div className="card-surface" style={{ padding: '1.25rem' }}>
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem',
+                    marginBottom: '1rem',
+                    paddingBottom: '0.85rem',
+                    borderBottom: '1px solid var(--col-border)',
+                  }}
+                >
+                  <Upload style={{ width: '0.9rem', height: '0.9rem', color: 'var(--col-green)' }} />
+                  <h2 style={{ fontWeight: 600, color: 'var(--col-text-primary)', fontSize: '0.9rem' }}>
+                    Upload Farm Image
+                  </h2>
+                </div>
+                <ImageUploader
+                  onImageSelected={(f) => { setSelectedFile(f); setError(null); setResult(null); }}
+                  isLoading={loading}
+                  showMetaFields
+                  onMetaChange={setMeta}
+                />
+              </div>
+
+              {/* Analyze + History buttons */}
+              <div style={{ display: 'flex', gap: '0.6rem' }}>
+                <button
+                  onClick={handleAnalyze}
+                  disabled={!selectedFile || loading || quotaUsed >= quotaLimit}
+                  className="btn btn-primary"
+                  style={{ flex: 1, padding: '0.8rem', fontSize: '0.925rem', height: '52px' }}
+                >
+                  {loading ? (
+                    <>
+                      <Loader2 style={{ width: '1rem', height: '1rem' }} className="animate-spin" />
+                      Analyzing…
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles style={{ width: '1rem', height: '1rem' }} />
+                      Analyze Trees
+                    </>
+                  )}
+                </button>
+                <Link href="/history">
+                  <button className="btn btn-ghost" style={{ padding: '0.8rem 1.1rem', height: '52px' }}>
+                    <History style={{ width: '0.95rem', height: '0.95rem' }} />
+                  </button>
+                </Link>
+              </div>
+
+              {/* Tips */}
+              <div className="card-surface" style={{ padding: '1rem 1.25rem' }}>
+                <p className="section-label" style={{ marginBottom: '0.75rem' }}>Tips for best results</p>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.55rem' }}>
+                  {[
+                    { emoji: '🚁', tip: 'Use drone or aerial images for counting' },
+                    { emoji: '☀️', tip: 'Good lighting improves accuracy' },
+                    { emoji: '🌿', tip: 'Canopy shots improve species detection' },
+                    { emoji: '📁', tip: 'JPEG · PNG · WEBP · up to 20 MB' },
+                  ].map(({ emoji, tip }) => (
+                    <div
+                      key={tip}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'flex-start',
+                        gap: '0.5rem',
+                        background: 'var(--col-surface-2)',
+                        borderRadius: 'var(--r-md)',
+                        padding: '0.65rem 0.75rem',
+                      }}
+                    >
+                      <span style={{ fontSize: '1rem', flexShrink: 0 }}>{emoji}</span>
+                      <p style={{ fontSize: '0.75rem', color: 'var(--col-text-muted)', lineHeight: 1.45 }}>{tip}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </>
+          )}
+        </div>
       </div>
-    </main>
+    </div>
   );
 }
