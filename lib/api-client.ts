@@ -1,30 +1,18 @@
-const API_BASE = 'https://api.weather-ai.co/v1';
-const API_KEY = process.env.NEXT_PUBLIC_WEATHER_AI_KEY ?? '';
-
-interface ApiResponse<T> {
-  success?: boolean;
-  data?: T;
-  error?: string;
-  message?: string;
-}
-
-function authHeaders(extra: Record<string, string> = {}): Record<string, string> {
-  return {
-    Authorization: `Bearer ${API_KEY}`,
-    ...extra,
-  };
-}
+const API_BASE = '/api/weather-ai';
 
 async function handleResponse<T>(res: Response): Promise<T> {
   const json = await res.json();
+
   if (!res.ok) {
-    throw new Error(json.message ?? json.error ?? `HTTP ${res.status}`);
+    throw new Error(json.message || json.error || `HTTP ${res.status}`);
   }
-  // API returns the payload directly (not wrapped in {success, data})
-  return json as T;
+
+  return json;
 }
 
-// ─── Weather ──────────────────────────────────────────────────
+
+
+// ─── Weather ─────────────────────────────────────
 
 export async function getWeather(
   latitude: number,
@@ -34,87 +22,64 @@ export async function getWeather(
   units: 'metric' | 'imperial' = 'metric'
 ) {
   const res = await fetch(
-    `${API_BASE}/weather?lat=${latitude}&lon=${longitude}&days=${days}&ai=true&units=${units}&lang=${lang}`,
-    { headers: authHeaders() }
+    `${API_BASE}/weather?lat=${latitude}&lon=${longitude}&days=${days}&ai=true&units=${units}&lang=${lang}`
   );
+
   return handleResponse<any>(res);
 }
 
-export async function getWeatherByCity(
-  cityName: string,
-  days = 7,
-  lang: 'en' | 'sw' = 'en',
-  units: 'metric' | 'imperial' = 'metric'
-) {
+export async function getCurrentWeather(lat: number, lon: number) {
   const res = await fetch(
-    `${API_BASE}/weather?city=${encodeURIComponent(cityName)}&days=${days}&ai=true&units=${units}&lang=${lang}`,
-    { headers: authHeaders() }
+    `${API_BASE}/current?lat=${lat}&lon=${lon}`
   );
+
   return handleResponse<any>(res);
 }
 
-// Skip AI summary to preserve quota when only refreshing current conditions
-export async function getCurrentWeather(latitude: number, longitude: number) {
+export async function getWeatherByCity(city: string) {
   const res = await fetch(
-    `${API_BASE}/current?lat=${latitude}&lon=${longitude}&ai=false`,
-    { headers: authHeaders() }
+    `${API_BASE}/weather?city=${encodeURIComponent(city)}`
   );
+
   return handleResponse<any>(res);
 }
 
-// ─── Trees / Forestry ─────────────────────────────────────────
+// ─── Trees ─────────────────────────────────────
 
-/**
- * Analyze a farm image for tree health.
- * Uses multipart/form-data as required by POST /v1/trees/analyze.
- */
-export async function analyzeTree(
-  imageFile: File,
-  meta?: {
-    farmerId?: string;
-    county?: string;
-    landAcres?: number;
-    location?: string;
-    notes?: string;
-  }
-) {
-  const form = new FormData();
-  form.append('image', imageFile);
-  if (meta?.farmerId)  form.append('farmerId',  meta.farmerId);
-  if (meta?.county)    form.append('county',    meta.county);
-  if (meta?.landAcres) form.append('landAcres', String(meta.landAcres));
-  if (meta?.location)  form.append('location',  meta.location);
-  if (meta?.notes)     form.append('notes',     meta.notes);
-
-  const res = await fetch(`${API_BASE}/trees/analyze`, {
-    method: 'POST',
-    headers: authHeaders(), // No Content-Type — let fetch set multipart boundary
-    body: form,
-  });
+export async function getQuotaUsage() {
+  const res = await fetch(`${API_BASE}/trees/quota`);
   return handleResponse<any>(res);
 }
 
 export async function getAnalysisHistory(limit = 20, cursor?: string) {
-  const params = new URLSearchParams({ limit: String(limit) });
-  if (cursor) params.set('cursor', cursor);
-  const res = await fetch(`${API_BASE}/trees/history?${params}`, {
-    headers: authHeaders(),
-  });
+  const res = await fetch(
+    `${API_BASE}/trees/history?limit=${limit}${cursor ? `&cursor=${cursor}` : ''}`
+  );
+
   return handleResponse<any>(res);
 }
 
-export async function getQuotaUsage() {
-  const res = await fetch(`${API_BASE}/trees/quota`, {
-    headers: authHeaders(),
+export async function analyzeTree(file: File, meta?: any) {
+  const form = new FormData();
+  form.append('image', file);
+
+  if (meta) {
+    Object.entries(meta).forEach(([k, v]) => {
+      if (v !== undefined) form.append(k, String(v));
+    });
+  }
+
+  const res = await fetch(`${API_BASE}/trees/analyze`, {
+    method: 'POST',
+    body: form,
   });
+
   return handleResponse<any>(res);
 }
 
-// ─── Account ──────────────────────────────────────────────────
+// ─── Account ─────────────────────────────────────
 
 export async function getUsageStats() {
-  const res = await fetch(`${API_BASE}/usage`, {
-    headers: authHeaders(),
-  });
+  const res = await fetch(`${API_BASE}/usage`);
   return handleResponse<any>(res);
 }

@@ -49,7 +49,7 @@ export default function DashboardPage() {
   const fetchByCity = useCallback(async (city: string) => {
     setLoading(true); setError(null);
     try {
-      const raw = await getWeatherByCity(city, 7, language);
+      const raw = await getWeatherByCity(city);
       const normalized = normalizeWeather(raw);
       setWeatherData(normalized);
       setLocation({ lat: normalized.location.lat, lng: normalized.location.lon });
