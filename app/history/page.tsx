@@ -4,12 +4,19 @@ import { useState, useEffect } from 'react';
 import { useStore } from '@/lib/store';
 import { getAnalysisHistory } from '@/lib/api-client';
 import { AnalysisResults } from '@/components/analysis-results';
-import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
-import { Loader2, ChevronLeft, ChevronRight } from 'lucide-react';
 import Link from 'next/link';
+import {
+  Loader2, ChevronLeft, ChevronRight,
+  TreePine, Clock, ArrowLeft, Sparkles, History,
+} from 'lucide-react';
 
 const ITEMS_PER_PAGE = 6;
+
+const HEALTH_DOT: Record<string, string> = {
+  healthy:  '#5cad6e',
+  diseased: '#c05c5c',
+  stressed: '#d4934a',
+};
 
 export default function HistoryPage() {
   const { analyses } = useStore();
@@ -21,221 +28,441 @@ export default function HistoryPage() {
   const [historyData, setHistoryData] = useState<any[]>(analyses || []);
 
   useEffect(() => {
-    // Load history from API
     const loadHistory = async () => {
-      setLoading(true);
+      setLoading(true); setError(null);
       try {
-        const data = await getAnalysisHistory(currentPage, ITEMS_PER_PAGE);
-        setHistoryData(data.analyses || []);
+        const data = await getAnalysisHistory(ITEMS_PER_PAGE);
+        const normalizedData = (data.analyses || []).map((item: any) => ({
+          id: item.analysis_id,
+          analysis_id: item.analysis_id,
+          timestamp: item.timestamp,
+          imageUrl: item.original_image_url,
+          overlayImageUrl: item.overlay_image_url,
+          treeCount: item.total_tree_count ?? 0,
+          confidence: typeof item.confidence_score === 'number' ? item.confidence_score : 0,
+          health: item.health_status || 'unknown',
+          location: item.location,
+          county: item.county,
+          landAcres: item.land_acres,
+          treeDensityPerAcre: item.tree_density_per_acre,
+          canopyCoveragePct: item.canopy_coverage_pct,
+          observations: item.observations || [],
+          ...item,
+        }));
+        setHistoryData(normalizedData);
       } catch (err: any) {
-        console.error('[v0] History error:', err);
-        // Fall back to local store
-        setHistoryData(analyses);
-      } finally {
-        setLoading(false);
-      }
+        setError('Failed to load history. Showing locally stored analyses.');
+        setHistoryData(
+          (analyses || []).map((item: any, index: number) => ({
+            ...item,
+            id: item.id || item.analysis_id || `local-analysis-${index}-${Date.now()}`,
+          }))
+        );
+      } finally { setLoading(false); }
     };
-
     loadHistory();
-  }, [currentPage, analyses]);
+  }, [analyses]);
 
-  const displayedData = selectedAnalysis ? [selectedAnalysis] : historyData;
-  const totalPages = Math.ceil(
-    (historyData.length || analyses.length) / ITEMS_PER_PAGE
-  );
+  const totalPages = Math.ceil(historyData.length / ITEMS_PER_PAGE);
+  const pagedData = historyData.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
 
   return (
-    <main className="min-h-screen bg-gradient-to-br from-blue-50 to-green-50 p-4 md:p-8">
-      <div className="max-w-4xl mx-auto space-y-6">
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-4xl font-bold text-gray-900">
-              Analysis History
-            </h1>
-            <p className="text-gray-600 mt-1">
-              Review your tree health analyses
-            </p>
-          </div>
-          <Link href="/analyze">
-            <Button className="bg-green-600 hover:bg-green-700">
-              New Analysis
-            </Button>
-          </Link>
-        </div>
+    <div className="app-bg" style={{ minHeight: '100vh' }}>
+      <div style={{ position: 'relative', zIndex: 1 }}>
 
-        {/* Error Message */}
-        {error && (
-          <Card className="p-4 bg-red-50 border-red-200">
-            <p className="text-sm text-red-700">{error}</p>
-          </Card>
-        )}
+        {/* ── Nav ───────────────────────────────────────────────── */}
+        <nav className="nav-bar">
+          <div
+            style={{
+              maxWidth: '1000px',
+              margin: '0 auto',
+              padding: '0 1.5rem',
+              height: '60px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+            }}
+          >
+            <Link href="/dashboard" style={{ textDecoration: 'none' }}>
+              <button className="btn btn-ghost" style={{ padding: '0.4rem 0.8rem', fontSize: '0.78rem' }}>
+                <ArrowLeft style={{ width: '0.85rem', height: '0.85rem' }} />
+                Dashboard
+              </button>
+            </Link>
 
-        {/* Detailed View */}
-        {selectedAnalysis && (
-          <>
-            <div className="flex items-center gap-2 mb-4">
-              <Button
-                onClick={() => setSelectedAnalysis(null)}
-                variant="outline"
-                size="sm"
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+              <div
+                style={{
+                  width: '28px',
+                  height: '28px',
+                  borderRadius: '7px',
+                  background: 'linear-gradient(135deg, #5cad6e, #3d7a4e)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
               >
-                <ChevronLeft className="w-4 h-4 mr-1" />
-                Back to List
-              </Button>
-            </div>
-            <AnalysisResults analysis={selectedAnalysis} />
-          </>
-        )}
-
-        {/* List View */}
-        {!selectedAnalysis && (
-          <>
-            {/* Loading State */}
-            {loading && (
-              <div className="flex items-center justify-center py-12">
-                <Loader2 className="w-8 h-8 animate-spin text-green-600" />
-                <span className="ml-2 text-gray-600">Loading history...</span>
+                <TreePine style={{ width: '14px', height: '14px', color: '#0b0f0d' }} />
               </div>
+              <span
+                style={{
+                  fontFamily: 'var(--font-display)',
+                  fontSize: '1.15rem',
+                  fontWeight: 700,
+                  color: 'var(--col-text-primary)',
+                  letterSpacing: '-0.02em',
+                }}
+              >
+                Farm<span style={{ color: 'var(--col-green)' }}>Guard</span>
+              </span>
+            </div>
+
+            <Link href="/analyze">
+              <button className="btn btn-primary" style={{ padding: '0.4rem 0.9rem', fontSize: '0.78rem' }}>
+                <Sparkles style={{ width: '0.82rem', height: '0.82rem' }} />
+                New Analysis
+              </button>
+            </Link>
+          </div>
+        </nav>
+
+        {/* ── Main ─────────────────────────────────────────────── */}
+        <div
+          style={{
+            maxWidth: '1000px',
+            margin: '0 auto',
+            padding: '2rem 1.5rem',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '1.25rem',
+          }}
+        >
+          {/* Page header */}
+          <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap' }}>
+            <div>
+              <h1
+                style={{
+                  fontFamily: 'var(--font-display)',
+                  fontSize: 'clamp(1.75rem, 4vw, 2.25rem)',
+                  fontWeight: 900,
+                  color: 'var(--col-text-primary)',
+                  lineHeight: 1.1,
+                  marginBottom: '0.25rem',
+                }}
+              >
+                Analysis History
+              </h1>
+              <p style={{ fontSize: '0.83rem', color: 'var(--col-text-muted)', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                <Clock style={{ width: '0.78rem', height: '0.78rem' }} />
+                Review your past tree health analyses
+              </p>
+            </div>
+            {historyData.length > 0 && (
+              <span className="tag tag-muted num">
+                {historyData.length} {historyData.length === 1 ? 'analysis' : 'analyses'}
+              </span>
             )}
+          </div>
 
-            {/* History Grid */}
-            {!loading && historyData.length > 0 && (
-              <>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {historyData
-                    .slice(
-                      (currentPage - 1) * ITEMS_PER_PAGE,
-                      currentPage * ITEMS_PER_PAGE
-                    )
-                    .map((item) => (
-                      <Card
-                        key={item.id}
-                        className="overflow-hidden hover:shadow-lg transition-shadow cursor-pointer"
-                        onClick={() => setSelectedAnalysis(item)}
-                      >
-                        <div className="relative">
-                          <img
-                            src={item.imageUrl}
-                            alt="Tree analysis"
-                            className="w-full h-40 object-cover"
-                          />
-                          <div className="absolute inset-0 bg-black/0 hover:bg-black/20 transition-colors flex items-center justify-center">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="opacity-0 hover:opacity-100 transition-opacity bg-white"
-                            >
-                              View Details
-                            </Button>
-                          </div>
-                        </div>
-                        <div className="p-4">
-                          <div className="flex items-center justify-between mb-2">
-                            <span
-                              className={`text-xs font-semibold px-2 py-1 rounded-full ${
-                                item.health === 'healthy'
-                                  ? 'bg-green-100 text-green-700'
-                                  : item.health === 'diseased'
-                                  ? 'bg-red-100 text-red-700'
-                                  : 'bg-yellow-100 text-yellow-700'
-                              }`}
-                            >
-                              {item.health.charAt(0).toUpperCase() +
-                                item.health.slice(1)}
-                            </span>
-                            <span className="text-xs text-gray-600">
-                              {(item.confidence * 100).toFixed(0)}%
-                            </span>
-                          </div>
-                          <p className="text-xs text-gray-500">
-                            {new Date(item.timestamp).toLocaleString()}
-                          </p>
-                          {item.observations.length > 0 && (
-                            <p className="text-sm text-gray-700 mt-2 line-clamp-2">
-                              {item.observations[0]}
-                            </p>
-                          )}
-                        </div>
-                      </Card>
-                    ))}
+          {/* Error */}
+          {error && (
+            <div
+              style={{
+                padding: '0.75rem 1rem',
+                background: 'rgba(212,147,74,0.1)',
+                border: '1px solid rgba(212,147,74,0.25)',
+                borderRadius: 'var(--r-md)',
+                fontSize: '0.83rem',
+                color: 'var(--col-amber)',
+              }}
+            >
+              {error}
+            </div>
+          )}
+
+          {/* Detailed view */}
+          {selectedAnalysis && (
+            <>
+              <button
+                onClick={() => setSelectedAnalysis(null)}
+                className="btn btn-ghost"
+                style={{ alignSelf: 'flex-start', fontSize: '0.78rem', padding: '0.4rem 0.85rem' }}
+              >
+                <ChevronLeft style={{ width: '0.85rem', height: '0.85rem' }} />
+                Back to list
+              </button>
+              <div className="card-surface animate-fade-up" style={{ padding: '1.25rem' }}>
+                <AnalysisResults analysis={selectedAnalysis} />
+              </div>
+            </>
+          )}
+
+          {/* List view */}
+          {!selectedAnalysis && (
+            <>
+              {loading && (
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.75rem', padding: '5rem 0', color: 'var(--col-text-muted)' }}>
+                  <Loader2 style={{ width: '1.4rem', height: '1.4rem', color: 'var(--col-green)' }} className="animate-spin" />
+                  <span style={{ fontSize: '0.85rem' }}>Loading history…</span>
                 </div>
+              )}
 
-                {/* Pagination */}
-                {totalPages > 1 && (
-                  <div className="flex items-center justify-center gap-2">
-                    <Button
-                      onClick={() =>
-                        setCurrentPage(Math.max(1, currentPage - 1))
-                      }
-                      disabled={currentPage === 1}
-                      variant="outline"
-                      size="sm"
+              {!loading && historyData.length > 0 && (
+                <>
+                  <div
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
+                      gap: '0.9rem',
+                    }}
+                  >
+                    {pagedData.map((item, i) => {
+                      const healthColor = HEALTH_DOT[item.health] ?? '#8fa891';
+                      const healthLabel = item.health
+                        ? item.health.charAt(0).toUpperCase() + item.health.slice(1)
+                        : 'Unknown';
+                      return (
+                        <div
+                          key={item.id || item.analysis_id}
+                          className="card-interactive animate-fade-up"
+                          style={{
+                            overflow: 'hidden',
+                            animationDelay: `${i * 40}ms`,
+                          }}
+                          onClick={() => setSelectedAnalysis(item)}
+                        >
+                          {/* Image */}
+                          <div style={{ position: 'relative' }}>
+                            <img
+                              src={item.imageUrl || '/placeholder-tree.jpg'}
+                              alt="Tree analysis"
+                              style={{ width: '100%', height: '10.5rem', objectFit: 'cover', display: 'block' }}
+                            />
+                            <div
+                              style={{
+                                position: 'absolute',
+                                inset: 0,
+                                background: 'linear-gradient(to top, rgba(0,0,0,0.65) 0%, transparent 55%)',
+                                display: 'flex',
+                                alignItems: 'flex-end',
+                                padding: '0.65rem',
+                              }}
+                            >
+                              <span
+                                style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '0.35rem',
+                                  padding: '0.22rem 0.6rem',
+                                  borderRadius: '99px',
+                                  background: 'rgba(0,0,0,0.5)',
+                                  backdropFilter: 'blur(8px)',
+                                  border: `1px solid ${healthColor}55`,
+                                  fontSize: '0.68rem',
+                                  fontWeight: 600,
+                                  color: healthColor,
+                                  fontFamily: 'var(--font-mono)',
+                                  letterSpacing: '0.05em',
+                                  textTransform: 'uppercase',
+                                }}
+                              >
+                                <span
+                                  style={{
+                                    width: '6px',
+                                    height: '6px',
+                                    borderRadius: '50%',
+                                    background: healthColor,
+                                    flexShrink: 0,
+                                  }}
+                                />
+                                {healthLabel}
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Info */}
+                          <div style={{ padding: '0.875rem 1rem' }}>
+                            <div
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                marginBottom: '0.45rem',
+                              }}
+                            >
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                                <TreePine style={{ width: '0.85rem', height: '0.85rem', color: 'var(--col-green)' }} />
+                                <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--col-text-primary)' }}>
+                                  {typeof item.treeCount === 'number'
+                                    ? `${item.treeCount} trees`
+                                    : 'Tree Analysis'}
+                                </span>
+                              </div>
+                              <span
+                                className="num"
+                                style={{
+                                  fontSize: '0.7rem',
+                                  color: 'var(--col-text-muted)',
+                                  background: 'var(--col-surface-3)',
+                                  padding: '0.15rem 0.5rem',
+                                  borderRadius: '99px',
+                                }}
+                              >
+                                {Number(item.confidence || 0).toFixed(0)}% conf
+                              </span>
+                            </div>
+
+                            <p
+                              className="num"
+                              style={{ fontSize: '0.72rem', color: 'var(--col-text-muted)', marginBottom: '0.45rem' }}
+                            >
+                              {item.timestamp
+                                ? new Date(item.timestamp).toLocaleString()
+                                : 'Unknown date'}
+                            </p>
+
+                            {item.observations?.length > 0 && (
+                              <p
+                                style={{
+                                  fontSize: '0.78rem',
+                                  color: 'var(--col-text-secondary)',
+                                  lineHeight: 1.45,
+                                  overflow: 'hidden',
+                                  display: '-webkit-box',
+                                  WebkitLineClamp: 2,
+                                  WebkitBoxOrient: 'vertical',
+                                }}
+                              >
+                                {item.observations[0]}
+                              </p>
+                            )}
+
+                            <div style={{ marginTop: '0.65rem', display: 'flex', justifyContent: 'flex-end' }}>
+                              <span
+                                style={{
+                                  fontSize: '0.72rem',
+                                  color: 'var(--col-green)',
+                                  fontWeight: 600,
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '0.2rem',
+                                }}
+                              >
+                                View Details
+                                <ChevronRight style={{ width: '0.72rem', height: '0.72rem' }} />
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Pagination */}
+                  {totalPages > 1 && (
+                    <div
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '0.35rem',
+                        paddingTop: '0.5rem',
+                      }}
                     >
-                      <ChevronLeft className="w-4 h-4" />
-                    </Button>
-                    <div className="flex gap-1">
+                      <button
+                        onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                        disabled={currentPage === 1}
+                        className="btn btn-ghost"
+                        style={{ padding: '0.4rem 0.55rem', borderRadius: 'var(--r-md)' }}
+                      >
+                        <ChevronLeft style={{ width: '0.9rem', height: '0.9rem' }} />
+                      </button>
+
                       {Array.from({ length: totalPages }).map((_, idx) => (
-                        <Button
-                          key={idx + 1}
+                        <button
+                          key={idx}
                           onClick={() => setCurrentPage(idx + 1)}
-                          variant={
-                            currentPage === idx + 1 ? 'default' : 'outline'
-                          }
-                          size="sm"
-                          className={
-                            currentPage === idx + 1
-                              ? 'bg-green-600'
-                              : ''
-                          }
+                          style={{
+                            width: '34px',
+                            height: '34px',
+                            borderRadius: 'var(--r-md)',
+                            border: '1px solid',
+                            borderColor: currentPage === idx + 1 ? 'var(--col-green)' : 'var(--col-border)',
+                            background: currentPage === idx + 1 ? 'var(--col-green)' : 'var(--col-surface)',
+                            color: currentPage === idx + 1 ? '#0b0f0d' : 'var(--col-text-muted)',
+                            fontFamily: 'var(--font-mono)',
+                            fontSize: '0.78rem',
+                            fontWeight: 600,
+                            cursor: 'pointer',
+                            transition: 'all 0.15s',
+                          }}
                         >
                           {idx + 1}
-                        </Button>
+                        </button>
                       ))}
+
+                      <button
+                        onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+                        disabled={currentPage === totalPages}
+                        className="btn btn-ghost"
+                        style={{ padding: '0.4rem 0.55rem', borderRadius: 'var(--r-md)' }}
+                      >
+                        <ChevronRight style={{ width: '0.9rem', height: '0.9rem' }} />
+                      </button>
                     </div>
-                    <Button
-                      onClick={() =>
-                        setCurrentPage(Math.min(totalPages, currentPage + 1))
-                      }
-                      disabled={currentPage === totalPages}
-                      variant="outline"
-                      size="sm"
-                    >
-                      <ChevronRight className="w-4 h-4" />
-                    </Button>
+                  )}
+                </>
+              )}
+
+              {/* Empty state */}
+              {!loading && historyData.length === 0 && analyses.length === 0 && (
+                <div
+                  style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    padding: '5rem 2rem',
+                    background: 'var(--col-surface)',
+                    border: '1px solid var(--col-border)',
+                    borderRadius: 'var(--r-2xl)',
+                    gap: '0.75rem',
+                    textAlign: 'center',
+                  }}
+                >
+                  <div
+                    style={{
+                      width: '56px',
+                      height: '56px',
+                      borderRadius: 'var(--r-lg)',
+                      background: 'var(--col-surface-2)',
+                      border: '1px solid var(--col-border)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      marginBottom: '0.35rem',
+                    }}
+                  >
+                    <History style={{ width: '1.5rem', height: '1.5rem', color: 'var(--col-text-muted)' }} />
                   </div>
-                )}
-              </>
-            )}
-
-            {/* Empty State */}
-            {!loading && historyData.length === 0 && analyses.length === 0 && (
-              <Card className="p-12 text-center bg-white">
-                <p className="text-gray-600 mb-4">No analysis history yet</p>
-                <Link href="/analyze">
-                  <Button className="bg-green-600 hover:bg-green-700">
-                    Start Analyzing Trees
-                  </Button>
-                </Link>
-              </Card>
-            )}
-          </>
-        )}
-
-        {/* Navigation */}
-        <div className="flex gap-2">
-          <Link href="/dashboard" className="flex-1">
-            <Button variant="outline" className="w-full">
-              Back to Dashboard
-            </Button>
-          </Link>
-          <Link href="/analyze" className="flex-1">
-            <Button className="w-full bg-green-600 hover:bg-green-700">
-              New Analysis
-            </Button>
-          </Link>
+                  <p style={{ fontWeight: 600, color: 'var(--col-text-secondary)', fontSize: '0.95rem' }}>
+                    No analysis history yet
+                  </p>
+                  <p style={{ fontSize: '0.8rem', color: 'var(--col-text-muted)', maxWidth: '280px' }}>
+                    Upload a farm image and run your first AI tree analysis.
+                  </p>
+                  <Link href="/analyze">
+                    <button className="btn btn-primary" style={{ marginTop: '0.5rem', padding: '0.6rem 1.4rem' }}>
+                      <Sparkles style={{ width: '0.9rem', height: '0.9rem' }} />
+                      Start Analyzing Trees
+                    </button>
+                  </Link>
+                </div>
+              )}
+            </>
+          )}
         </div>
       </div>
-    </main>
+    </div>
   );
 }

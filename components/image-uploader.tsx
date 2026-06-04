@@ -1,121 +1,253 @@
 'use client';
 
-import { useState } from 'react';
-import { Upload, AlertCircle } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
+import { useState, useCallback } from 'react';
+import { Upload, AlertCircle, X, ImageIcon, Replace } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 interface ImageUploaderProps {
   onImageSelected: (file: File) => void;
   isLoading?: boolean;
+  showMetaFields?: boolean;
+  onMetaChange?: (meta: {
+    county?: string;
+    landAcres?: number;
+    location?: string;
+    notes?: string;
+  }) => void;
 }
 
-export function ImageUploader({ onImageSelected, isLoading = false }: ImageUploaderProps) {
+export function ImageUploader({
+  onImageSelected,
+  isLoading = false,
+  showMetaFields = false,
+  onMetaChange,
+}: ImageUploaderProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [preview, setPreview] = useState<string | null>(null);
+  const [fileName, setFileName] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [meta, setMeta] = useState({ county: '', landAcres: '', location: '', notes: '' });
 
-  const handleFile = (file: File) => {
-    setError(null);
+  const processFile = useCallback(
+    (file: File) => {
+      setError(null);
+      if (!file.type.startsWith('image/')) {
+        setError('Please upload an image file (JPEG, PNG, or WEBP).');
+        return;
+      }
+      if (file.size > 20 * 1024 * 1024) {
+        setError('File size must be under 20 MB.');
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = (e) => setPreview(e.target?.result as string);
+      reader.readAsDataURL(file);
+      setFileName(file.name);
+      onImageSelected(file);
+    },
+    [onImageSelected]
+  );
 
-    // Validate file type
-    if (!file.type.startsWith('image/')) {
-      setError('Please upload an image file');
-      return;
-    }
+  const handleDrop = useCallback(
+    (e: React.DragEvent) => {
+      e.preventDefault();
+      setIsDragging(false);
+      const file = e.dataTransfer.files[0];
+      if (file) processFile(file);
+    },
+    [processFile]
+  );
 
-    // Validate file size (max 10MB)
-    if (file.size > 10 * 1024 * 1024) {
-      setError('File size must be less than 10MB');
-      return;
-    }
+  const handleChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (file) processFile(file);
+    },
+    [processFile]
+  );
 
-    // Create preview
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      setPreview(e.target?.result as string);
-    };
-    reader.readAsDataURL(file);
+  const clearImage = () => { setPreview(null); setFileName(null); setError(null); };
 
-    onImageSelected(file);
-  };
-
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(false);
-
-    const files = e.dataTransfer.files;
-    if (files.length > 0) {
-      handleFile(files[0]);
-    }
-  };
-
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (files && files.length > 0) {
-      handleFile(files[0]);
-    }
+  const updateMeta = (key: keyof typeof meta, value: string) => {
+    const next = { ...meta, [key]: value };
+    setMeta(next);
+    onMetaChange?.({
+      county: next.county || undefined,
+      landAcres: next.landAcres ? parseFloat(next.landAcres) : undefined,
+      location: next.location || undefined,
+      notes: next.notes || undefined,
+    });
   };
 
   return (
-    <div className="w-full">
-      <Card
-        onDragOver={(e) => {
-          e.preventDefault();
-          setIsDragging(true);
-        }}
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.875rem' }}>
+      {/* Drop Zone */}
+      <div
+        onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
         onDragLeave={() => setIsDragging(false)}
         onDrop={handleDrop}
-        className={`p-8 border-2 border-dashed transition-colors cursor-pointer ${
-          isDragging
-            ? 'border-green-500 bg-green-50'
-            : 'border-gray-300 bg-gray-50'
-        }`}
+        className={cn('drop-zone', isDragging && 'dragging', isLoading && 'pointer-events-none opacity-50')}
+        style={{ position: 'relative', overflow: 'hidden' }}
       >
         {preview ? (
-          <div className="space-y-4">
+          <div style={{ position: 'relative' }}>
             <img
               src={preview}
-              alt="Preview"
-              className="w-full h-48 object-cover rounded-lg"
+              alt="Selected farm image"
+              style={{ width: '100%', maxHeight: '16rem', objectFit: 'cover', display: 'block' }}
             />
-            <Button
-              onClick={() => document.getElementById('file-input')?.click()}
-              variant="outline"
-              disabled={isLoading}
-              className="w-full"
+            <div
+              style={{
+                position: 'absolute',
+                inset: 0,
+                background: 'linear-gradient(to top, rgba(0,0,0,0.75) 0%, transparent 50%)',
+                display: 'flex',
+                alignItems: 'flex-end',
+                justifyContent: 'space-between',
+                padding: '0.75rem',
+              }}
             >
-              Choose Another Image
-            </Button>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                <ImageIcon style={{ height: '0.85rem', width: '0.85rem', color: 'rgba(255,255,255,0.7)' }} />
+                <span style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.7)', maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {fileName}
+                </span>
+              </div>
+              <div style={{ display: 'flex', gap: '0.4rem' }}>
+                <button
+                  className="btn btn-ghost"
+                  style={{ padding: '0.3rem 0.7rem', fontSize: '0.72rem', background: 'rgba(0,0,0,0.5)', borderColor: 'rgba(255,255,255,0.2)', color: 'rgba(255,255,255,0.85)' }}
+                  onClick={() => document.getElementById('fg-file-input')?.click()}
+                  disabled={isLoading}
+                >
+                  Replace
+                </button>
+                <button
+                  className="btn btn-ghost"
+                  style={{ padding: '0.3rem 0.5rem', background: 'rgba(0,0,0,0.5)', borderColor: 'rgba(255,255,255,0.2)', color: 'rgba(255,255,255,0.85)' }}
+                  onClick={clearImage}
+                  disabled={isLoading}
+                >
+                  <X style={{ height: '0.8rem', width: '0.8rem' }} />
+                </button>
+              </div>
+            </div>
           </div>
         ) : (
-          <label className="flex flex-col items-center justify-center cursor-pointer">
-            <Upload className="w-12 h-12 text-green-600 mb-2" />
-            <p className="text-lg font-semibold text-gray-700 mb-1">
-              Drag and drop your image here
-            </p>
-            <p className="text-sm text-gray-500 mb-4">
-              or click to browse
-            </p>
-            <input
-              id="file-input"
-              type="file"
-              accept="image/*"
-              onChange={handleChange}
-              className="hidden"
-              disabled={isLoading}
-            />
-            <span className="text-xs text-gray-400">
-              PNG, JPG up to 10MB
-            </span>
+          <label
+            htmlFor="fg-file-input"
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '0.75rem',
+              padding: '3rem 1.5rem',
+              cursor: 'pointer',
+            }}
+          >
+            {/* Upload icon container */}
+            <div
+              style={{
+                width: '3.5rem',
+                height: '3.5rem',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                borderRadius: 'var(--r-lg)',
+                background: 'var(--col-green-glow)',
+                border: '1px solid rgba(92,173,110,0.3)',
+              }}
+            >
+              <Upload style={{ height: '1.4rem', width: '1.4rem', color: 'var(--col-green)' }} />
+            </div>
+            <div style={{ textAlign: 'center' }}>
+              <p style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--col-text-primary)', marginBottom: '0.25rem' }}>
+                Drop your farm image here
+              </p>
+              <p style={{ fontSize: '0.75rem', color: 'var(--col-text-muted)' }}>
+                or click to browse &nbsp;·&nbsp; JPEG · PNG · WEBP · max 20 MB
+              </p>
+            </div>
           </label>
         )}
-      </Card>
 
+        <input
+          id="fg-file-input"
+          type="file"
+          accept="image/jpeg,image/png,image/webp"
+          onChange={handleChange}
+          style={{ display: 'none' }}
+          disabled={isLoading}
+        />
+      </div>
+
+      {/* Meta Fields */}
+      {showMetaFields && (
+        <div
+          style={{
+            background: 'var(--col-surface-2)',
+            border: '1px solid var(--col-border)',
+            borderRadius: 'var(--r-lg)',
+            padding: '0.875rem',
+            display: 'grid',
+            gridTemplateColumns: '1fr 1fr',
+            gap: '0.6rem',
+          }}
+        >
+          <p className="section-label" style={{ gridColumn: '1 / -1', marginBottom: '0.1rem' }}>
+            Optional context — improves AI accuracy
+          </p>
+          {[
+            { key: 'county',    label: 'County / Region',   placeholder: 'e.g. Bomet', span: false },
+            { key: 'landAcres', label: 'Plot size (acres)',  placeholder: 'e.g. 2.5',  span: false },
+            { key: 'location',  label: 'Farm name / GPS',   placeholder: 'e.g. Kapkimolwa Block C', span: true },
+          ].map(({ key, label, placeholder, span }) => (
+            <div key={key} style={{ gridColumn: span ? '1 / -1' : undefined }}>
+              <label style={{ fontSize: '0.7rem', color: 'var(--col-text-muted)', display: 'block', marginBottom: '0.3rem' }}>
+                {label}
+              </label>
+              <input
+                type={key === 'landAcres' ? 'number' : 'text'}
+                placeholder={placeholder}
+                value={meta[key as keyof typeof meta]}
+                onChange={(e) => updateMeta(key as keyof typeof meta, e.target.value)}
+                className="field"
+                style={{ fontSize: '0.8rem' }}
+              />
+            </div>
+          ))}
+          <div style={{ gridColumn: '1 / -1' }}>
+            <label style={{ fontSize: '0.7rem', color: 'var(--col-text-muted)', display: 'block', marginBottom: '0.3rem' }}>
+              Notes for AI
+            </label>
+            <textarea
+              placeholder="e.g. Tea plantation, recently pruned…"
+              rows={2}
+              value={meta.notes}
+              onChange={(e) => updateMeta('notes', e.target.value)}
+              className="field"
+              style={{ resize: 'none', fontSize: '0.8rem' }}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Error */}
       {error && (
-        <div className="mt-4 flex items-gap-2 p-3 bg-red-50 border border-red-200 rounded-lg">
-          <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
-          <p className="text-sm text-red-700 ml-2">{error}</p>
+        <div
+          style={{
+            display: 'flex',
+            gap: '0.5rem',
+            alignItems: 'flex-start',
+            padding: '0.65rem 0.85rem',
+            background: 'rgba(192,92,92,0.1)',
+            border: '1px solid rgba(192,92,92,0.25)',
+            borderRadius: 'var(--r-md)',
+          }}
+        >
+          <AlertCircle style={{ height: '0.9rem', width: '0.9rem', color: '#c05c5c', flexShrink: 0, marginTop: '0.1rem' }} />
+          <p style={{ fontSize: '0.82rem', color: '#c05c5c' }}>{error}</p>
         </div>
       )}
     </div>
