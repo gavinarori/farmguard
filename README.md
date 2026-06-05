@@ -75,6 +75,4 @@ farmguard/
 
 FarmGuard helps farmers access accurate weather information to support planning and decision-making for activities such as irrigation, planting, harvesting, and crop management.
 
-## License
 
-This project is available for educational and demonstration purposes.
